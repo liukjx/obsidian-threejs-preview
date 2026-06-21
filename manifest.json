@@ -1,0 +1,10 @@
+{
+  "id": "threejs-preview",
+  "name": "Three.js Preview",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Render ```threejs code blocks as interactive 3D previews in Obsidian reading view",
+  "author": "liukjx",
+  "authorUrl": "https://github.com/liukjx",
+  "isDesktopOnly": false
+}
