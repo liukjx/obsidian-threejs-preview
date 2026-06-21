@@ -79,8 +79,8 @@ module.exports = class ThreeJSPreviewPlugin extends Plugin {
       + '<div id="c"></div>'
       + '<script>'
       + 'try{'
-      + 'var c=document.getElementById("c");'
-      + 'var w=c.clientWidth||600,h=c.clientHeight||400;'
+      + 'var container=document.getElementById("c");'
+      + 'var w=container.clientWidth||600,h=c.clientHeight||400;'
       + orbitSetup
       + s.replace(/XXX_ENDSCRIPT_XXX/g, '<\\/script>')
       + '}catch(e){document.body.innerHTML="<pre>"+e.message+"</pre>"}'
