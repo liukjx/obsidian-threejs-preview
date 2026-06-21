@@ -16,28 +16,40 @@ module.exports = class ThreeJSPreviewPlugin extends Plugin {
     await this.loadSettings();
     this.addSettingTab(new ThreeJSPreviewSettingTab(this.app, this));
 
-    // Register processor for ```threejs (basic)
+    // Register processor for ```threejs
     this.registerMarkdownCodeBlockProcessor('threejs', (source, el, ctx) => {
       this.createPreview(source, el, false);
     });
 
-    // Register processor for ```threejs-orbit (always has OrbitControls)
+    // Register processor for ```threejs-orbit
     this.registerMarkdownCodeBlockProcessor('threejs-orbit', (source, el, ctx) => {
       this.createPreview(source, el, true);
     });
 
-    // When theme changes, tell all preview iframes to update
+    // When theme changes, recreate all preview iframes
     this.registerEvent(this.app.workspace.on('css-change', () => {
-      this.broadcastTheme();
+      requestAnimationFrame(function() {
+        // Wait for DOM to settle after theme change, then recreate
+        document.querySelectorAll('iframe[data-threejs-src]').forEach(function(iframe) {
+          var el = iframe.parentElement;
+          if (!el) return;
+          var src = iframe.dataset.threejsSrc;
+          var orbit = iframe.dataset.threejsOrbit === 'true';
+          // Use the plugin instance to recreate
+          if (window.__threejsPlugin) {
+            window.__threejsPlugin.recreatePreview(el, src, orbit);
+          }
+        });
+      });
     }));
   }
 
   createPreview(source, el, forceOrbit) {
-    const isDark = this.isDarkMode();
-    const useOrbit = forceOrbit || this.settings.enableOrbitControls;
-    const themeBg = isDark ? this.settings.darkBackground : this.settings.lightBackground;
+    var isDark = this.isDarkMode();
+    var useOrbit = forceOrbit || this.settings.enableOrbitControls;
+    var themeBg = isDark ? this.settings.darkBackground : this.settings.lightBackground;
 
-    const iframe = document.createElement('iframe');
+    var iframe = document.createElement('iframe');
     iframe.style.width = '100%';
     iframe.style.height = this.settings.previewHeight + 'px';
     iframe.style.border = 'none';
@@ -46,36 +58,23 @@ module.exports = class ThreeJSPreviewPlugin extends Plugin {
     iframe.loading = 'lazy';
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
     iframe.title = 'Three.js preview';
-    iframe.dataset.themebg = themeBg;
+    iframe.dataset.threejsSrc = source;
+    iframe.dataset.threejsOrbit = useOrbit ? 'true' : 'false';
 
-    const html = buildPreviewHtml(source, this.settings, useOrbit, isDark);
+    var html = buildPreviewHtml(source, this.settings, useOrbit, isDark);
     iframe.srcdoc = html;
 
     el.empty();
     el.appendChild(iframe);
   }
 
+  recreatePreview(el, source, forceOrbit) {
+    this.createPreview(source, el, forceOrbit);
+  }
+
   isDarkMode() {
     return document.body.classList.contains('theme-dark') ||
       document.body.getAttribute('saved-theme') === 'dark';
-  }
-
-  broadcastTheme() {
-    const isDark = this.isDarkMode();
-    const bg = isDark ? this.settings.darkBackground : this.settings.lightBackground;
-
-    document.querySelectorAll('iframe[title="Three.js preview"]').forEach(function (iframe) {
-      iframe.style.background = bg;
-      iframe.dataset.themebg = bg;
-      if (iframe.contentWindow) {
-        iframe.contentWindow.postMessage({
-          type: 'threejs-theme',
-          isDark: isDark,
-          darkBg: isDark ? bg : null,
-          lightBg: isDark ? null : bg
-        }, '*');
-      }
-    });
   }
 
   onunload() {}
@@ -90,14 +89,14 @@ module.exports = class ThreeJSPreviewPlugin extends Plugin {
 };
 
 function buildPreviewHtml(code, settings, orbitEnabled, isDark) {
-  const safeCode = (code || '').replace(/<\/script>/gi, '<\\/script>');
-  const bg = isDark ? settings.darkBackground : settings.lightBackground;
+  var safeCode = (code || '').replace(/<\/script>/gi, '<\\/script>');
+  var bg = isDark ? settings.darkBackground : settings.lightBackground;
 
-  let extraScripts = '';
-  let orbitCode = '';
+  var extraScripts = '';
+  var orbitCode = '';
 
   if (orbitEnabled) {
-    extraScripts += '<script src="' + ORBIT_CONTROLS_CDN + '"><\/script>\n';
+    extraScripts = '<script src="' + ORBIT_CONTROLS_CDN + '"><\\/script>\n  ';
     orbitCode = [
       'var controls = null;',
       'var __origRAF = window.requestAnimationFrame;',
@@ -115,7 +114,7 @@ function buildPreviewHtml(code, settings, orbitEnabled, isDark) {
     '<html>',
     '<head>',
     '  <meta charset="utf-8">',
-    '  <script src="' + settings.cdnUrl + '"><\/script>',
+    '  <script src="' + settings.cdnUrl + '"><\\/script>',
     '  ' + extraScripts,
     '  <style>',
     '    * { margin: 0; padding: 0; box-sizing: border-box; }',
@@ -128,7 +127,6 @@ function buildPreviewHtml(code, settings, orbitEnabled, isDark) {
     '  <div id="three-container"></div>',
     '  <script>',
     '  try {',
-    '    var isDark = ' + isDark + ';',
     '    var container = document.getElementById("three-container");',
     '    var w = container.clientWidth || 600;',
     '    var h = container.clientHeight || 400;',
@@ -137,14 +135,7 @@ function buildPreviewHtml(code, settings, orbitEnabled, isDark) {
     '  } catch(e) {',
     '    document.body.innerHTML = \'<pre class="error-msg">Three.js error:\\\\n\' + e.message + \'\\\\n\' + (e.stack || \'\') + \'</pre>\';',
     '  }',
-    '  window.addEventListener("message", function(e) {',
-    '    if (e.data && e.data.type === "threejs-theme") {',
-    '      isDark = e.data.isDark;',
-    '      var bg = isDark ? (e.data.darkBg || "' + (isDark ? bg : settings.darkBackground) + '") : (e.data.lightBg || "' + (!isDark ? bg : settings.lightBackground) + '");',
-    '      document.body.style.background = bg;',
-    '    }',
-    '  });',
-    '  <\/script>',
+    '  <\\/script>',
     '</body>',
     '</html>'
   ].join('\n');
@@ -154,10 +145,12 @@ class ThreeJSPreviewSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
+    // Store plugin reference globally for recreatePreview
+    window.__threejsPlugin = plugin;
   }
 
   display() {
-    const { containerEl } = this;
+    var containerEl = this.containerEl;
     containerEl.empty();
     containerEl.createEl('h2', { text: 'Three.js Preview Settings' });
 
@@ -189,9 +182,9 @@ class ThreeJSPreviewSettingTab extends PluginSettingTab {
       }.bind(this));
 
     new Setting(containerEl)
-      .setName('Enable OrbitControls')
-      .setDesc('Auto-inject OrbitControls so you can interactively rotate/zoom the 3D scene. ' +
-        'Use new THREE.OrbitControls(camera, renderer.domElement) in your code.')
+      .setName('Enable OrbitControls for ```threejs blocks')
+      .setDesc('When enabled, all basic ```threejs blocks also get OrbitControls injected. ' +
+        'Use ```threejs-orbit for blocks that always need OrbitControls regardless.')
       .addToggle(function(toggle) {
         toggle.setValue(this.plugin.settings.enableOrbitControls)
           .onChange(async function(value) {
@@ -202,7 +195,7 @@ class ThreeJSPreviewSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Dark mode background')
-      .setDesc('Background color for the preview iframe in dark mode (CSS color).')
+      .setDesc('Background color of the preview iframe in dark mode. CSS color value.')
       .addText(function(text) {
         text.setPlaceholder('#1a1a2e')
           .setValue(this.plugin.settings.darkBackground)
@@ -214,7 +207,7 @@ class ThreeJSPreviewSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Light mode background')
-      .setDesc('Background color for the preview iframe in light mode (CSS color).')
+      .setDesc('Background color of the preview iframe in light mode. CSS color value.')
       .addText(function(text) {
         text.setPlaceholder('#e8e8e8')
           .setValue(this.plugin.settings.lightBackground)
@@ -225,7 +218,7 @@ class ThreeJSPreviewSettingTab extends PluginSettingTab {
       }.bind(this));
 
     containerEl.createEl('p', {
-      text: '💡 After changing settings, refresh the reading view to apply. Theme changes apply live.',
+      text: 'Theme changes are applied live. Refresh reading view for setting changes to take effect.',
       cls: 'setting-item-description'
     });
   }
