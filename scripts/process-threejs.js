@@ -29,7 +29,8 @@ function processHtml(filePath, html) {
 
   return html.replace(regex, (match, encodedCode) => {
     blockCounter++;
-    const id = `threejs-${blockCounter}`;
+    const fname = `initThreeJS_${blockCounter}`;
+    const cid = `threejs-container-${blockCounter}`;
 
     // Decode HTML entities and strip syntax-highlighting tags (span, etc.)
     const code = stripHtmlTags(decodeHtmlEntities(encodedCode));
@@ -43,12 +44,12 @@ function processHtml(filePath, html) {
     // Generate working Three.js HTML
     return `
 <div class="threejs-wrapper" style="position:relative;width:100%;height:400px;border-radius:12px;overflow:hidden;background:#1a1a2e;margin:1em 0;">
-  <div id="${id}" style="width:100%;height:100%;"></div>
+  <div id="${cid}" style="width:100%;height:100%;"></div>
 </div>
 <script src="${CDN}"><\/script>
 <script>
-function init_${id}() {
-  var container = document.getElementById('${id}');
+function ${fname}() {
+  var container = document.getElementById('${cid}');
   if (!container || container.dataset.initialized) return;
   container.dataset.initialized = 'true';
   var w = container.clientWidth || 600;
@@ -60,11 +61,11 @@ function init_${id}() {
   }
 }
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init_${id});
+  document.addEventListener('DOMContentLoaded', ${fname});
 } else {
-  init_${id}();
+  ${fname}();
 }
-document.addEventListener('nav', init_${id});
+document.addEventListener('nav', ${fname});
 <\/script>`.trim();
   });
 }
