@@ -46,11 +46,11 @@ function processHtml(filePath, html) {
       extraScript = '<script src="' + ORBIT_CDN + '"><\\/script>\n  ';
       orbitWrap = [
         'var controls = null;',
-        'var __origRAF = window.requestAnimationFrame;',
-        'window.requestAnimationFrame = function(cb) {',
-        '  return __origRAF.call(window, function() {',
+        'var __origRAF = window.requestAnimationFrame.bind(window);',
+        'var requestAnimationFrame = function(cb) {',
+        '  return __origRAF(function(timestamp) {',
         "    if (controls && typeof controls.update === 'function') controls.update();",
-        '    cb();',
+        '    cb(timestamp);',
         '  });',
         '};'
       ].join('\n    ');

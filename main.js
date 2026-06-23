@@ -55,11 +55,11 @@ module.exports = class ThreeJSPreviewPlugin extends Plugin {
       orbitLoad = '<script src="' + ORBIT + '">' + '</script>';
       orbitSetup = [
         'var controls=null;',
-        'var _r=requestAnimationFrame;',
-        'requestAnimationFrame=function(fn){',
-        '  return _r.call(window,function(){',
+        'var _r=requestAnimationFrame.bind(window);',
+        'var requestAnimationFrame=function(fn){',
+        '  return _r(function(t){',
         '    if(controls&&controls.update)controls.update();',
-        '    fn();',
+        '    fn(t);',
         '  });',
         '};'
       ].join('\n');
